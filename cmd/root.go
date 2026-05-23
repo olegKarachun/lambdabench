@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"fmt"
+	"context"
 	"log"
 	"os"
 
@@ -20,15 +20,15 @@ var rootCmd = &cobra.Command{
 	Long:  "",
 	Run: func(cmd *cobra.Command, args []string) {
 		if function == "" {
-			fmt.Println("Error: define function name to test")
-			os.Exit(1)
+			log.Fatalln("Error: define function name to test")
 		}
+
 		runner, err := internal.NewRunner(function, region, requests, concurrency)
 		if err != nil {
 			log.Fatalf("Failed to initialize runner: %v", err)
 		}
 
-		if err := runner.Start(); err != nil {
+		if err := runner.Start(context.Background()); err != nil {
 			log.Fatalf("Benchmark execution failed: %v", err)
 		}
 	},
