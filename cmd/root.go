@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/olegKarachun/lambdabench/internal"
@@ -22,10 +23,13 @@ var rootCmd = &cobra.Command{
 			fmt.Println("Error: define function name to test")
 			os.Exit(1)
 		}
-		runner := internal.NewRunner(function, region, requests, concurrency)
-		er := runner.Start()
-		if er != nil {
-			fmt.Println(er.Error())
+		runner, err := internal.NewRunner(function, region, requests, concurrency)
+		if err != nil {
+			log.Fatalf("Failed to initialize runner: %v", err)
+		}
+
+		if err := runner.Start(); err != nil {
+			log.Fatalf("Benchmark execution failed: %v", err)
 		}
 	},
 }
