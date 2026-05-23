@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/olegKarachun/lambdabench/internal"
 	"github.com/spf13/cobra"
 )
 
-var uri string
+var region string
+var function string
 var requests int
 var concurrency int
 
@@ -16,7 +18,15 @@ var rootCmd = &cobra.Command{
 	Short: "",
 	Long:  "",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("Testing URL: %s with %d requests\n", uri, requests)
+		if function == "" {
+			fmt.Println("Error: define function name to test")
+			os.Exit(1)
+		}
+		runner := internal.NewRunner(function, region, requests, concurrency)
+		er := runner.Start()
+		if er != nil {
+			fmt.Println(er.Error())
+		}
 	},
 }
 
@@ -28,7 +38,8 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.Flags().StringVarP(&uri, "url", "u", "", "URL to test")
+	rootCmd.Flags().StringVarP(&region, "region", "g", "eu-central-1", "Region where a lambda is placed")
+	rootCmd.Flags().StringVarP(&function, "function", "f", "", "Lambda to test")
 	rootCmd.Flags().IntVarP(&requests, "requests", "r", 0, "Total number of requests")
 	rootCmd.Flags().IntVarP(&concurrency, "concurrency", "c", 1, "Concurrency level")
 }
