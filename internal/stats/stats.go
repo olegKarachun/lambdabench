@@ -2,6 +2,7 @@ package stats
 
 import (
 	"log"
+	"sort"
 	"time"
 )
 
@@ -11,45 +12,61 @@ type Result struct {
 }
 
 func CalculateAndPrintBenchmarkSummary(results chan Result) {
-	log.Println("—--- Benchmark Summary —---")
-	successRequests := 0
-	totalRequests := 0
+	var times []time.Duration
+	var successCount int
+	var failCount int
+	var totalTime time.Duration
 
-	var min time.Duration
-	var max time.Duration
-	var total time.Duration
-
-	for result := range results {
-		totalRequests++
-		if result.IsSuccessful {
-			successRequests++
-			total += result.RequestTime
+	for res := range results {
+		if res.IsSuccessful {
+			times = append(times, res.RequestTime)
+			totalTime += res.RequestTime
+			successCount++
 		} else {
-			continue
-		}
-		if min == 0 {
-			min = result.RequestTime
-		}
-		if result.RequestTime < min {
-			min = result.RequestTime
-		}
-		if result.RequestTime > max {
-			max = result.RequestTime
+			failCount++
 		}
 	}
+
+	totalRequests := successCount + failCount
+
+	log.Println("—--- Benchmark Summary —---")
 	log.Printf("Total Requests: %d\n", totalRequests)
-	log.Printf("Success Requests: %d", successRequests)
+	log.Printf("Success Requests: %d\n", successCount)
+	log.Printf("Failed Requests: %d\n", failCount)
+
+	if successCount == 0 {
+		log.Println("No successful requests to calculate latencies.")
+		log.Println("---------------------------")
+		return
+	}
+
+	sort.Slice(times, func(i, j int) bool {
+		return times[i] < times[j]
+	})
+
+	min := times[0]
+	max := times[len(times)-1]
+	avg := totalTime / time.Duration(successCount)
+
+	p50Index := int(float64(successCount) * 0.50)
+	p90Index := int(float64(successCount) * 0.90)
+	p99Index := int(float64(successCount) * 0.99)
+
+	if p50Index >= successCount {
+		p50Index = successCount - 1
+	}
+	if p90Index >= successCount {
+		p90Index = successCount - 1
+	}
+	if p99Index >= successCount {
+		p99Index = successCount - 1
+	}
+
 	log.Printf("Min Latency: %s\n", min)
 	log.Printf("Max Latency: %s\n", max)
-
-	var averageDuration time.Duration
-
-	if successRequests > 0 {
-		averageDuration = total / time.Duration(successRequests)
-	} else {
-		averageDuration = time.Duration(0)
-	}
-
-	log.Printf("Avg Latency: %s\n", averageDuration)
+	log.Printf("Avg Latency: %s\n", avg)
+	log.Printf("p50 Latency: %s\n", times[p50Index])
+	log.Printf("p90 Latency: %s\n", times[p90Index])
+	log.Printf("p99 Latency: %s\n", times[p99Index])
 	log.Println("---------------------------")
 }
