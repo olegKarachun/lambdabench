@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/olegKarachun/lambdabench/internal/config"
 	"github.com/olegKarachun/lambdabench/internal/runner"
 	"github.com/spf13/cobra"
 )
@@ -13,12 +14,43 @@ var region string
 var function string
 var requests int
 var concurrency int
+var configPath string
 
 var rootCmd = &cobra.Command{
 	Use:   "lambdabench",
 	Short: "",
 	Long:  "",
 	Run: func(cmd *cobra.Command, args []string) {
+		var cfg *config.Config
+
+		if cmd.Flags().Changed("config") {
+			configuration, err := config.Load(configPath)
+			if err != nil {
+				log.Fatalln("Error parsing YAML configuration")
+			}
+
+			cfg = configuration
+		}
+
+		if cfg != nil {
+
+			if !cmd.Flags().Changed("region") && cfg.Region != "" {
+				region = cfg.Region
+			}
+
+			if !cmd.Flags().Changed("function") && cfg.Function != "" {
+				function = cfg.Function
+			}
+
+			if !cmd.Flags().Changed("requests") && cfg.Requests > 0 {
+				requests = cfg.Requests
+			}
+
+			if !cmd.Flags().Changed("concurrency") && cfg.Concurrency > 0 {
+				concurrency = cfg.Concurrency
+			}
+		}
+
 		if function == "" {
 			log.Fatalln("Error: define function name to test")
 		}
@@ -42,6 +74,7 @@ func Execute() {
 }
 
 func init() {
+	rootCmd.Flags().StringVar(&configPath, "config", "", "Path to YAML config")
 	rootCmd.Flags().StringVarP(&region, "region", "g", "eu-central-1", "Region where a lambda is placed")
 	rootCmd.Flags().StringVarP(&function, "function", "f", "", "Lambda to test")
 	rootCmd.Flags().IntVarP(&requests, "requests", "r", 0, "Total number of requests")
