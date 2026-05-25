@@ -1,4 +1,0 @@
-region: "eu-central-1"
-function: "DotNetNativeAot"
-requests: 4
-concurrency: 2
