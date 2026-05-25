@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/olegKarachun/lambdabench/internal"
+	"github.com/olegKarachun/lambdabench/internal/runner"
 	"github.com/spf13/cobra"
 )
 
@@ -23,7 +23,7 @@ var rootCmd = &cobra.Command{
 			log.Fatalln("Error: define function name to test")
 		}
 
-		runner, err := internal.NewRunner(function, region, requests, concurrency)
+		runner, err := runner.NewRunner(function, region, requests, concurrency)
 		if err != nil {
 			log.Fatalf("Failed to initialize runner: %v", err)
 		}
