@@ -46,6 +46,10 @@ func (r *Runner) Start(ctx context.Context) error {
 		return fmt.Errorf("aws lambda client is not initialized")
 	}
 
+	if r.warmup {
+		r.Warmup(context.Background())
+	}
+
 	jobs := make(chan int, r.requests)
 	results := make(chan stats.Result, r.requests)
 
@@ -100,6 +104,45 @@ func (r *Runner) Start(ctx context.Context) error {
 	log.Println("Benchmark round finished!")
 
 	return nil
+}
+
+func (r *Runner) Warmup(ctx context.Context) {
+	wg := sync.WaitGroup{}
+
+	var tasksNumber int
+
+	if r.requests < r.concurrency {
+		tasksNumber = r.requests
+	} else {
+		tasksNumber = r.concurrency
+	}
+
+	wg.Add(tasksNumber)
+
+	for i := 0; i < tasksNumber; i++ {
+		go func(workerId int) {
+			defer wg.Done()
+
+			payloadBytes, err := r.marshalPayload(workerId)
+			if err != nil {
+				log.Printf("[Worker %d] Error marshaling payload for warmup job %d: %v\n", workerId, i, err)
+			}
+
+			log.Printf("[Worker %d] Sending warmup request %d to AWS Lambda...\n", workerId, i)
+
+			output, err := r.lambdaClient.Invoke(ctx, &lambda.InvokeInput{
+				FunctionName: &r.function,
+				Payload:      payloadBytes,
+			})
+			if err != nil {
+				log.Printf("[Worker %d] Request %d failed: %v\n", workerId, i, err)
+			}
+
+			log.Printf("[Worker %d] Request %d completed with status code: %d.\n", workerId, i, output.StatusCode)
+		}(i)
+	}
+
+	wg.Wait()
 }
 
 func (r *Runner) marshalPayload(jobID int) ([]byte, error) {
