@@ -19,10 +19,11 @@ type Runner struct {
 	region       string
 	requests     int
 	concurrency  int
+	warmup       bool
 	lambdaClient *lambda.Client
 }
 
-func NewRunner(function string, region string, requests int, concurrency int) (*Runner, error) {
+func NewRunner(function string, region string, requests int, concurrency int, warmup bool) (*Runner, error) {
 	cfg, err := config.LoadDefaultConfig(context.Background(), config.WithRegion(region))
 	if err != nil {
 		return nil, err
@@ -33,6 +34,7 @@ func NewRunner(function string, region string, requests int, concurrency int) (*
 		region:       region,
 		requests:     requests,
 		concurrency:  concurrency,
+		warmup:       warmup,
 		lambdaClient: client,
 	}, nil
 }

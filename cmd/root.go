@@ -14,6 +14,7 @@ var region string
 var function string
 var requests int
 var concurrency int
+var warmup bool
 var configPath string
 
 var rootCmd = &cobra.Command{
@@ -33,6 +34,9 @@ var rootCmd = &cobra.Command{
 		}
 
 		if cfg != nil {
+			if !cmd.Flags().Changed("warmup") && cfg.Warmup {
+				warmup = cfg.Warmup
+			}
 
 			if !cmd.Flags().Changed("region") && cfg.Region != "" {
 				region = cfg.Region
@@ -55,7 +59,7 @@ var rootCmd = &cobra.Command{
 			log.Fatalln("Error: define function name to test")
 		}
 
-		runner, err := runner.NewRunner(function, region, requests, concurrency)
+		runner, err := runner.NewRunner(function, region, requests, concurrency, warmup)
 		if err != nil {
 			log.Fatalf("Failed to initialize runner: %v", err)
 		}
@@ -74,6 +78,7 @@ func Execute() {
 }
 
 func init() {
+	rootCmd.Flags().BoolVarP(&warmup, "warmup", "w", false, "Enable automatic warm-up to prevent cold starts")
 	rootCmd.Flags().StringVar(&configPath, "config", "", "Path to YAML config")
 	rootCmd.Flags().StringVarP(&region, "region", "g", "eu-central-1", "Region where a lambda is placed")
 	rootCmd.Flags().StringVarP(&function, "function", "f", "", "Lambda to test")
