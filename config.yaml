@@ -1,5 +1,5 @@
 region: ""
-function: "GolangTitan"
+function: ""
 requests: 4
 concurrency: 2
 warmup: false
