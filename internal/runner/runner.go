@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"log"
 	"sync"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
+	"github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"github.com/olegKarachun/lambdabench/internal/models"
 	"github.com/olegKarachun/lambdabench/internal/stats"
 )
@@ -77,11 +77,10 @@ func (r *Runner) Start(ctx context.Context) error {
 
 				log.Printf("[Worker %d] Sending request %d to AWS Lambda...\n", workerId, job)
 
-				invokedAt := time.Now()
-
 				output, err := r.lambdaClient.Invoke(ctx, &lambda.InvokeInput{
 					FunctionName: &r.function,
 					Payload:      payloadBytes,
+					LogType:      types.LogTypeTail,
 				})
 				if err != nil {
 					log.Printf("[Worker %d] Request %d failed: %v\n", workerId, job, err)
@@ -89,7 +88,21 @@ func (r *Runner) Start(ctx context.Context) error {
 					continue
 				}
 
-				results <- stats.Result{IsSuccessful: true, RequestTime: time.Since(invokedAt)}
+				insights, err := getInvokeInsights(output)
+				if err != nil {
+					log.Printf("[Worker %d] Request %d failed to parse invoke output: %v\n", workerId, job, err)
+					results <- stats.Result{IsSuccessful: false}
+					continue
+				}
+
+				results <- stats.Result{
+					IsSuccessful:   true,
+					Duration:       insights.Duration,
+					InitDuration:   insights.InitDuration,
+					BilledDuration: insights.BilledDuration,
+					MemorySize:     insights.MemorySize,
+					MaxMemoryUsed:  insights.MaxMemoryUsed,
+				}
 
 				log.Printf("[Worker %d] Request %d completed with status code: %d.\n", workerId, job, output.StatusCode)
 			}
