@@ -1,0 +1,8 @@
+{
+    "requestId": "req-bench",
+    "transactions": [
+        { "id": "tx-1", "amount": 150.5, "type": "CREDIT" },
+        { "id": "tx-2", "amount": 25.0, "type": "DEBIT" },
+        { "id": "tx-3", "amount": 500.0, "type": "CREDIT" }
+    ]
+}

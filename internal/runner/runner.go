@@ -2,15 +2,14 @@ package runner
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/lambda/types"
-	"github.com/olegKarachun/lambdabench/internal/models"
 	"github.com/olegKarachun/lambdabench/internal/stats"
 )
 
@@ -20,21 +19,28 @@ type Runner struct {
 	requests     int
 	concurrency  int
 	warmup       bool
+	payload      []byte
 	lambdaClient *lambda.Client
 }
 
-func NewRunner(function string, region string, requests int, concurrency int, warmup bool) (*Runner, error) {
+func NewRunner(payloadPath string, function string, region string, requests int, concurrency int, warmup bool) (*Runner, error) {
 	cfg, err := config.LoadDefaultConfig(context.Background(), config.WithRegion(region))
 	if err != nil {
 		return nil, err
 	}
 	client := lambda.NewFromConfig(cfg)
+	payload, err := readData(payloadPath)
+	if err != nil {
+		log.Fatalf("failed to read payload file: %w", err)
+	}
+
 	return &Runner{
 		function:     function,
 		region:       region,
 		requests:     requests,
 		concurrency:  concurrency,
 		warmup:       warmup,
+		payload:      payload,
 		lambdaClient: client,
 	}, nil
 }
@@ -69,17 +75,11 @@ func (r *Runner) Start(ctx context.Context) error {
 			defer wg.Done()
 
 			for job := range jobs {
-				payloadBytes, err := r.marshalPayload(workerId)
-				if err != nil {
-					log.Printf("[Worker %d] Error marshaling payload for job %d: %v\n", workerId, job, err)
-					continue
-				}
-
 				log.Printf("[Worker %d] Sending request %d to AWS Lambda...\n", workerId, job)
 
 				output, err := r.lambdaClient.Invoke(ctx, &lambda.InvokeInput{
 					FunctionName: &r.function,
-					Payload:      payloadBytes,
+					Payload:      r.payload,
 					LogType:      types.LogTypeTail,
 				})
 				if err != nil {
@@ -136,16 +136,11 @@ func (r *Runner) Warmup(ctx context.Context) {
 		go func(workerId int) {
 			defer wg.Done()
 
-			payloadBytes, err := r.marshalPayload(workerId)
-			if err != nil {
-				log.Printf("[Worker %d] Error marshaling payload for warmup job %d: %v\n", workerId, i, err)
-			}
-
 			log.Printf("[Worker %d] Sending warmup request %d to AWS Lambda...\n", workerId, i)
 
 			output, err := r.lambdaClient.Invoke(ctx, &lambda.InvokeInput{
 				FunctionName: &r.function,
-				Payload:      payloadBytes,
+				Payload:      r.payload,
 			})
 			if err != nil {
 				log.Printf("[Worker %d] Request %d failed: %v\n", workerId, i, err)
@@ -158,15 +153,14 @@ func (r *Runner) Warmup(ctx context.Context) {
 	wg.Wait()
 }
 
-func (r *Runner) marshalPayload(jobID int) ([]byte, error) {
-	p := models.LambdaPayload{
-		RequestID: fmt.Sprintf("req-bench-%d", jobID),
-		Transactions: []models.Transaction{
-			{ID: "tx-1", Amount: 150.50, Type: "CREDIT"},
-			{ID: "tx-2", Amount: 10.50, Type: "DEBIT"},
-			{ID: "tx-3", Amount: 1150.50, Type: "CREDIT"},
-		},
+func readData(payloadPath string) ([]byte, error) {
+	if payloadPath != "" {
+		payload, err := os.ReadFile(payloadPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read payload file: %w", err)
+		}
+		return payload, nil
+	} else {
+		return []byte("{}"), nil
 	}
-
-	return json.Marshal(p)
 }
